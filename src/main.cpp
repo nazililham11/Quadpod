@@ -21,10 +21,10 @@ float site_expect[4][3];
 bool is_stand;
 
 // Gerakan kaki
-const float z_base = -50;
-const float z_stand = -85;
-const float x_base = 60;
-const float y_base = 0;
+float z_base = -50;
+float z_stand = -85;
+float x_base = 60;
+float y_base = 0;
 
 // Kecepatan Gerakan
 float move_speed = 1;
@@ -32,16 +32,16 @@ float stand_seat_speed = 1;
 float temp_speed[4][3];
 
 // Dimensi
-const float coxa_len = 25;   // Coxa (mm)
-const float femur_len = 42;  // Femur (mm)
-const float tibia_len = 72;  // Coxa (mm)
+float coxa_len = 25;   // Coxa (mm)
+float femur_len = 42;  // Femur (mm)
+float tibia_len = 72;  // Coxa (mm)
 
 // Konstan
 const float pi = 3.1415926;
 const float KEEP = 255;
 
 // Task Timer
-uint16_t site_timer_ms = 50;
+uint16_t site_timer_ms = 20;
 unsigned long site_timer;
 uint16_t job_timer_ms = 5000;
 unsigned long job_timer;
@@ -114,6 +114,17 @@ void servo_write(uint8_t leg, float coxa, float femur, float tibia) {
 void cmd_init() {
     command.AddCommand(F("servo"), cmd_set_servo);
     command.SetDefaultHandler(cmd_unknown);
+
+    command.AddVariable(F("site_timer_ms"), site_timer_ms);
+
+    command.AddVariable(F("coxa_len"), coxa_len);
+    command.AddVariable(F("femur_len"), femur_len);
+    command.AddVariable(F("tibia_len"), tibia_len);
+
+    command.AddVariable(F("z_base"), z_base);
+    command.AddVariable(F("z_stand"), z_stand);
+    command.AddVariable(F("x_base"), x_base);
+    command.AddVariable(F("y_base"), y_base);
 }
 
 void cmd_unknown() { Serial.println(F("Unknown Command")); }
