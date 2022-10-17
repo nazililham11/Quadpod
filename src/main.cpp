@@ -3,6 +3,10 @@
 #include <CommandHandler.h>
 #include <Servo.h>
 
+// Enable Services
+#define ENABLE_SERVICES_PIN PORT_F_3 
+bool enable_services = true;
+
 // Servo
 Servo servo[4][3];
 const uint8_t servo_pin[4][3] = {
@@ -68,29 +72,35 @@ void gait_stand();
 void setup() {
     Serial.begin(115200);
     Serial.println("Setup");
+    
+    pinMode(ENABLE_SERVICES_PIN, INPUT_PULLUP);
 
     cmd_init();
     servo_init();
     site_init();
 
+    enable_services = digitalRead(ENABLE_SERVICES_PIN);
+
     Serial.println("Setup Done");
 }
 
 void loop() {
-    unsigned long currentTime = millis();
+    if (enable_services) {
+        unsigned long currentTime = millis();
 
-    if (currentTime - site_timer > site_timer_ms) {
-        site_timer = currentTime;
-        site_services();
-    }
+        if (currentTime - site_timer > site_timer_ms) {
+            site_timer = currentTime;
+            site_services();
+        }
 
-    if (currentTime - job_timer > job_timer_ms) {
-        job_timer = currentTime;
-        if (is_stand)
-            gait_sit();
-        else
-            gait_stand();
-        is_stand = !is_stand;
+        if (currentTime - job_timer > job_timer_ms) {
+            job_timer = currentTime;
+            if (is_stand)
+                gait_sit();
+            else
+                gait_stand();
+            is_stand = !is_stand;
+        }
     }
 
     command.Process();
@@ -243,7 +253,7 @@ void ik_polar_to_servo(uint8_t leg, float &alpha, float &beta, float &gamma) {
             beta = beta;
             gamma = 90 - gamma;
             break;
-
+            
         case 1:  // Depan Kanan
         case 3:  // Belakang Kiri
             alpha = 90 + alpha;
