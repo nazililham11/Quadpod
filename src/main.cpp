@@ -3,17 +3,23 @@
 #include <CommandHandler.h>
 #include <Servo.h>
 
+// ID kaki
+#define FRONT_R 0  // Depan Kanan
+#define REAR_R 1   // Belakang Kanan
+#define FRONT_L 2  // Depan Kiri
+#define REAR_L 3   // Belakang Kiri
+
 // Enable Services
-#define ENABLE_SERVICES_PIN PORT_F_3 
+#define ENABLE_SERVICES_PIN PORT_F_3
 bool enable_services = true;
 
 // Servo
 Servo servo[4][3];
 const uint8_t servo_pin[4][3] = {
     // Coxa,    Femur,    Tibia
-    {PORT_F_7, PORT_F_6, PORT_F_5},   // Depan Kiri
     {PORT_A_0, PORT_A_1, PORT_A_2},   // Depan Kanan
     {PORT_D_7, PORT_D_6, PORT_D_5},   // Belakang Kanan
+    {PORT_F_7, PORT_F_6, PORT_F_5},   // Depan Kiri
     {PORT_B_7, PORT_B_6, PORT_B_5}};  // Belakang Kiri
 
 // Command
@@ -29,6 +35,7 @@ float z_base = -50;
 float z_stand = -85;
 float x_base = 60;
 float y_base = 0;
+float y_step = 40;
 
 // Kecepatan Gerakan
 float move_speed = 1;
@@ -72,7 +79,7 @@ void gait_stand();
 void setup() {
     Serial.begin(115200);
     Serial.println("Setup");
-    
+
     pinMode(ENABLE_SERVICES_PIN, INPUT_PULLUP);
 
     cmd_init();
@@ -168,10 +175,10 @@ void cmd_set_servo(CommandParameter &params) {
 }
 
 void site_init() {
-    site_set(0, x_base, y_base, z_base);  // Depan kiri
-    site_set(1, x_base, y_base, z_base);  // Depan kanan
-    site_set(2, x_base, y_base, z_base);  // Belakang kanan
-    site_set(3, x_base, y_base, z_base);  // Belakang kiri
+    site_set(FRONT_L, x_base, y_base, z_base);  // Depan kiri
+    site_set(FRONT_R, x_base, y_base, z_base);  // Depan kanan
+    site_set(REAR_R, x_base, y_base, z_base);   // Belakang kanan
+    site_set(REAR_L, x_base, y_base, z_base);   // Belakang kiri
 
     for (uint8_t i = 0; i < 4; i++) {
         for (uint8_t j = 0; j < 3; j++) {
@@ -247,18 +254,17 @@ void ik_cartesian_to_polar(float &alpha, float &beta, float &gamma, float x,
 
 void ik_polar_to_servo(uint8_t leg, float &alpha, float &beta, float &gamma) {
     switch (leg) {
-        case 2:  // Belakang Kanan
-        case 0:  // Depan Kiri
+        case REAR_R:
+        case FRONT_L:
             alpha = 90 - alpha;
             beta = beta;
             gamma = 90 - gamma;
             break;
-            
-        case 1:  // Depan Kanan
-        case 3:  // Belakang Kiri
+        case FRONT_R:
+        case REAR_L:
             alpha = 90 + alpha;
             beta = 180 - beta;
-            gamma += 90;
+            gamma = 90 + gamma;
             break;
     }
 }
@@ -266,17 +272,17 @@ void ik_polar_to_servo(uint8_t leg, float &alpha, float &beta, float &gamma) {
 void gait_sit() {
     Serial.println("Sit");
     move_speed = stand_seat_speed;
-    site_set(0, x_base, y_base, z_base);  // Depan kiri
-    site_set(1, x_base, y_base, z_base);  // Depan kanan
-    site_set(2, x_base, y_base, z_base);  // Belakang kanan
-    site_set(3, x_base, y_base, z_base);  // Belakang kiri
+    site_set(FRONT_L, x_base, y_base + y_step, z_base);  // Depan kiri
+    site_set(FRONT_R, x_base, y_base + y_step, z_base);  // Depan kanan
+    site_set(REAR_R, x_base, y_base + y_step, z_base);   // Belakang kanan
+    site_set(REAR_L, x_base, y_base + y_step, z_base);   // Belakang kiri
 }
 
 void gait_stand() {
     Serial.println("Stand");
     move_speed = stand_seat_speed;
-    site_set(0, x_base, y_base, z_stand);  // Depan kiri
-    site_set(1, x_base, y_base, z_stand);  // Depan kanan
-    site_set(2, x_base, y_base, z_stand);  // Belakang kanan
-    site_set(3, x_base, y_base, z_stand);  // Belakang kiri
+    site_set(FRONT_L, x_base, y_base + y_step, z_stand);  // Depan kiri
+    site_set(FRONT_R, x_base, y_base + y_step, z_stand);  // Depan kanan
+    site_set(REAR_R, x_base, y_base + y_step, z_stand);   // Belakang kanan
+    site_set(REAR_L, x_base, y_base + y_step, z_stand);   // Belakang kiri
 }
