@@ -9,6 +9,14 @@
 #define FRONT_L 2  // Depan Kiri
 #define REAR_L 3   // Belakang Kiri
 
+// ID gait action
+#define SIT 0
+#define STAND 1
+#define MOVE_FORWARD 2
+#define MOVE_BACKWARD 3
+#define TURN_LEFT 4
+#define TURN_RIGHT 5
+
 // Enable Services
 #define ENABLE_SERVICES_PIN PORT_F_3
 bool enable_services = true;
@@ -28,7 +36,6 @@ CommandHandler<> command(Serial, '[', ']');
 // Posisi kaki
 float site_now[4][3];
 float site_expect[4][3];
-bool is_stand;
 
 // Gerakan kaki
 float z_base = -50;
@@ -71,8 +78,6 @@ const float turn_y0 = temp_b * sin(temp_alpha) - turn_y1 - length_side;
 // Task Timer
 uint16_t site_timer_ms = 20;
 unsigned long site_timer;
-uint16_t job_timer_ms = 5000;
-unsigned long job_timer;
 
 // Function
 void servo_init();
@@ -82,6 +87,7 @@ void cmd_init();
 void cmd_unknown();
 void cmd_set_servo(CommandParameter &params);
 void cmd_set_site(CommandParameter &params);
+void cmd_gait_action(CommandParameter &params);
 
 void site_init();
 void site_set(uint8_t leg, float x, float y, float z);
@@ -117,21 +123,11 @@ void setup() {
 
 void loop() {
     if (enable_services) {
-        // unsigned long currentTime = millis();
-
-        // if (currentTime - site_timer > site_timer_ms) {
-        //     site_timer = currentTime;
-        //     site_services();
-        // }
-
-        // if (currentTime - job_timer > job_timer_ms) {
-        //     job_timer = currentTime;
-        //     if (is_stand)
-        //         gait_sit();
-        //     else
-        //         gait_stand();
-        //     is_stand = !is_stand;
-        // }
+        gait_sit();
+        gait_stand();
+        gait_move_forward(10);
+        gait_move_backward(10);
+        gait_turn_left(10);
         gait_turn_right(10);
     }
 
@@ -156,6 +152,7 @@ void servo_write(uint8_t leg, float coxa, float femur, float tibia) {
 void cmd_init() {
     command.AddCommand(F("servo"), cmd_set_servo);
     command.AddCommand(F("site"), cmd_set_site);
+    command.AddCommand(F("gait_action"), cmd_gait_action);
     command.SetDefaultHandler(cmd_unknown);
 
     command.AddVariable(F("site_timer_ms"), site_timer_ms);
@@ -212,10 +209,10 @@ void cmd_set_site(CommandParameter &params) {
         params.NextParameterAsInteger(),
         params.NextParameterAsInteger(),
         params.NextParameterAsInteger(),
-    };  
+    };
 
     for (uint8_t i = 0; i < 3; i++) {
-        if (site[i] > -100 &&  site[i] < 100) {
+        if (site[i] > -100 && site[i] < 100) {
             Serial.print(F(" "));
             Serial.print(site[i]);
         } else {
@@ -229,6 +226,40 @@ void cmd_set_site(CommandParameter &params) {
     ik_cartesian_to_polar(femur, tibia, coxa, site[0], site[1], site[2]);
     ik_polar_to_servo(leg, femur, tibia, coxa);
     servo_write(leg, coxa, femur, tibia);
+}
+
+void cmd_gait_action(CommandParameter &params) {
+    int action_id = params.NextParameterAsInteger();
+    if (action_id < 0 || action_id > 5) return;
+
+    Serial.print(F("Gait Action "));
+
+    switch (action_id) {
+        case 0: Serial.print(F("sit")); break;
+        case 1: Serial.print(F("stand")); break;
+        case 2: Serial.print(F("move_forward")); break;
+        case 3: Serial.print(F("move_backward")); break;
+        case 4: Serial.print(F("turn_left")); break;
+        case 5: Serial.print(F("turn_right")); break;
+    }
+
+    int step = 0;
+    if (action_id >= 2) {
+        step = params.NextParameterAsInteger();
+        if (step < 0) return;
+        Serial.print(F(" step "));
+    }
+    Serial.println();
+
+    switch (action_id) {
+        case 0: gait_sit(); break;
+        case 1: gait_stand(); break;
+        case 2: gait_move_forward(step); break;
+        case 3: gait_move_backward(step); break;
+        case 4: gait_turn_left(step); break;
+        case 5: gait_turn_right(step); break;
+    }
+
 }
 
 void site_init() {
@@ -353,6 +384,7 @@ void gait_sit() {
     site_set(FRONT_R, x_base, y_base + y_step, z_base);  // Depan kanan
     site_set(REAR_R, x_base, y_base + y_step, z_base);   // Belakang kanan
     site_set(REAR_L, x_base, y_base + y_step, z_base);   // Belakang kiri
+    site_wait_all();
 }
 
 void gait_stand() {
@@ -362,6 +394,7 @@ void gait_stand() {
     site_set(FRONT_R, x_base, y_base + y_step, z_stand);  // Depan kanan
     site_set(REAR_R, x_base, y_base + y_step, z_stand);   // Belakang kanan
     site_set(REAR_L, x_base, y_base + y_step, z_stand);   // Belakang kiri
+    site_wait_all();
 }
 
 void gait_move_forward(uint8_t step) {
