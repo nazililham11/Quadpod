@@ -33,6 +33,7 @@ bool is_stand;
 // Gerakan kaki
 float z_base = -50;
 float z_stand = -85;
+float z_up = -30;
 float x_base = 60;
 float y_base = 0;
 float y_step = 40;
@@ -40,6 +41,8 @@ float y_step = 40;
 // Kecepatan Gerakan
 float move_speed = 1;
 float stand_seat_speed = 1;
+float leg_move_speed = 10;
+float body_move_speed = 1.5;
 float temp_speed[4][3];
 
 // Dimensi
@@ -68,6 +71,8 @@ void cmd_set_servo(CommandParameter &params);
 void site_init();
 void site_set(uint8_t leg, float x, float y, float z);
 void site_services();
+void site_wait(uint8_t leg);
+void site_wait_all();
 
 void ik_polar_to_servo(uint8_t leg, float &alpha, float &beta, float &gamma);
 void ik_cartesian_to_polar(float &alpha, float &beta, float &gamma, float x,
@@ -75,6 +80,7 @@ void ik_cartesian_to_polar(float &alpha, float &beta, float &gamma, float x,
 
 void gait_sit();
 void gait_stand();
+void gait_move_forward(uint8_t step);
 
 void setup() {
     Serial.begin(115200);
@@ -93,21 +99,22 @@ void setup() {
 
 void loop() {
     if (enable_services) {
-        unsigned long currentTime = millis();
+        // unsigned long currentTime = millis();
 
-        if (currentTime - site_timer > site_timer_ms) {
-            site_timer = currentTime;
-            site_services();
-        }
+        // if (currentTime - site_timer > site_timer_ms) {
+        //     site_timer = currentTime;
+        //     site_services();
+        // }
 
-        if (currentTime - job_timer > job_timer_ms) {
-            job_timer = currentTime;
-            if (is_stand)
-                gait_sit();
-            else
-                gait_stand();
-            is_stand = !is_stand;
-        }
+        // if (currentTime - job_timer > job_timer_ms) {
+        //     job_timer = currentTime;
+        //     if (is_stand)
+        //         gait_sit();
+        //     else
+        //         gait_stand();
+        //     is_stand = !is_stand;
+        // }
+        gait_move_forward(10);
     }
 
     command.Process();
@@ -230,6 +237,26 @@ void site_services() {
     }
 }
 
+void site_wait(uint8_t leg) {
+    while (1) {
+        unsigned long currentTime = millis();
+        if (currentTime - site_timer > site_timer_ms) {
+            site_timer = currentTime;
+            site_services();
+        }
+        if (site_now[leg][0] != site_expect[leg][0]) continue;
+        if (site_now[leg][1] != site_expect[leg][1]) continue;
+        if (site_now[leg][2] != site_expect[leg][2]) continue;
+        break;
+    }
+}
+
+void site_wait_all() {
+    for (uint8_t i = 0; i < 4; i++) {
+        site_wait(i);
+    }
+}
+
 void ik_cartesian_to_polar(float &alpha, float &beta, float &gamma, float x,
                            float y, float z) {
     float v, w;
@@ -285,4 +312,57 @@ void gait_stand() {
     site_set(FRONT_R, x_base, y_base + y_step, z_stand);  // Depan kanan
     site_set(REAR_R, x_base, y_base + y_step, z_stand);   // Belakang kanan
     site_set(REAR_L, x_base, y_base + y_step, z_stand);   // Belakang kiri
+}
+
+void gait_move_forward(uint8_t step) {
+    Serial.print("Move Forward for ");
+    Serial.print(step);
+    Serial.println(" step");
+
+    move_speed = leg_move_speed;
+    while (step-- > 0) {
+        if (site_now[FRONT_L][1] == y_base) {
+            // Gerak kaki depan kiri dan belakang kanan
+            site_set(FRONT_L, x_base, y_base, z_up);
+            site_wait_all();
+            site_set(FRONT_L, x_base, y_base + 2 * y_step, z_up);
+            site_wait_all();
+            site_set(FRONT_L, x_base, y_base + 2 * y_step, z_base);
+            site_wait_all();
+            move_speed = body_move_speed;
+            site_set(FRONT_R, x_base, y_base, z_base);
+            site_set(REAR_R, x_base, y_base + 2 * y_step, z_base);
+            site_set(FRONT_L, x_base, y_base + y_step, z_base);
+            site_set(REAR_L, x_base, y_base + y_step, z_base);
+            site_wait_all();
+            move_speed = leg_move_speed;
+            site_set(REAR_R, x_base, y_base + 2 * y_step, z_up);
+            site_wait_all();
+            site_set(REAR_R, x_base, y_base, z_up);
+            site_wait_all();
+            site_set(REAR_R, x_base, y_base, z_base);
+            site_wait_all();
+        } else {
+            // Gerak kaki depan kanan dan belakang kiri
+            site_set(FRONT_R, x_base, y_base, z_up);
+            site_wait_all();
+            site_set(FRONT_R, x_base, y_base + 2 * y_step, z_up);
+            site_wait_all();
+            site_set(FRONT_R, x_base, y_base + 2 * y_step, z_base);
+            site_wait_all();
+            move_speed = body_move_speed;
+            site_set(FRONT_R, x_base, y_base + y_step, z_base);
+            site_set(REAR_R, x_base, y_base + y_step, z_base);
+            site_set(FRONT_L, x_base, y_base, z_base);
+            site_set(REAR_L, x_base, y_base + 2 * y_step, z_base);
+            site_wait_all();
+            move_speed = leg_move_speed;
+            site_set(REAR_L, x_base, y_base + 2 * y_step, z_up);
+            site_wait_all();
+            site_set(REAR_L, x_base, y_base, z_up);
+            site_wait_all();
+            site_set(REAR_L, x_base, y_base, z_base);
+            site_wait_all();
+        }
+    }
 }
