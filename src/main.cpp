@@ -41,18 +41,32 @@ float y_step = 40;
 // Kecepatan Gerakan
 float move_speed = 1;
 float stand_seat_speed = 1;
-float leg_move_speed = 10;
+float leg_move_speed = 8;
 float body_move_speed = 1.5;
+float spot_turn_speed = 4;
 float temp_speed[4][3];
 
 // Dimensi
-float coxa_len = 25;   // Coxa (mm)
-float femur_len = 42;  // Femur (mm)
-float tibia_len = 72;  // Coxa (mm)
+float coxa_len = 25;     // Coxa (mm)
+float femur_len = 42;    // Femur (mm)
+float tibia_len = 72;    // Coxa (mm)
+float length_side = 77;  // Jarak antar kaki (mm)
 
 // Konstan
 const float pi = 3.1415926;
 const float KEEP = 255;
+
+// Konstan untuk putar
+const float temp_a = sqrt(pow(2 * x_base + length_side, 2) + pow(y_step, 2));
+const float temp_b = 2 * (y_base + y_step) + length_side;
+const float temp_c = sqrt(pow(2 * x_base + length_side, 2) +
+                          pow(2 * y_base + y_step + length_side, 2));
+const float temp_alpha = acos(
+    (pow(temp_a, 2) + pow(temp_b, 2) - pow(temp_c, 2)) / 2 / temp_a / temp_b);
+const float turn_x1 = (temp_a - length_side) / 2;
+const float turn_y1 = y_base + y_step / 2;
+const float turn_x0 = turn_x1 - temp_b * cos(temp_alpha);
+const float turn_y0 = temp_b * sin(temp_alpha) - turn_y1 - length_side;
 
 // Task Timer
 uint16_t site_timer_ms = 20;
@@ -82,6 +96,8 @@ void gait_sit();
 void gait_stand();
 void gait_move_forward(uint8_t step);
 void gait_move_backward(uint8_t step);
+void gait_turn_left(uint8_t step);
+void gait_turn_right(uint8_t step);
 
 void setup() {
     Serial.begin(115200);
@@ -115,7 +131,7 @@ void loop() {
         //         gait_stand();
         //     is_stand = !is_stand;
         // }
-        gait_move_backward(10);
+        gait_turn_right(10);
     }
 
     command.Process();
@@ -416,6 +432,128 @@ void gait_move_backward(uint8_t step) {
             site_set(FRONT_L, x_base, y_base, z_up);
             site_wait_all();
             site_set(FRONT_L, x_base, y_base, z_base);
+            site_wait_all();
+        }
+    }
+}
+
+void gait_turn_left(uint8_t step) {
+    Serial.print("Turn Left for ");
+    Serial.print(step);
+    Serial.println(" step");
+
+    move_speed = spot_turn_speed;
+    while (step-- > 0) {
+        if (site_now[REAR_L][1] == y_base) {
+            // Gerak kaki belakang kiri dan belakang kanan
+            site_set(REAR_L, x_base, y_base, z_up);
+            site_wait_all();
+            site_set(FRONT_R, turn_x1, turn_y1, z_base);
+            site_set(REAR_R, turn_x0, turn_y0, z_base);
+            site_set(FRONT_L, turn_x1, turn_y1, z_base);
+            site_set(REAR_L, turn_x0, turn_y0, z_up);
+            site_wait_all();
+            site_set(REAR_L, turn_x0, turn_y0, z_base);
+            site_wait_all();
+            site_set(FRONT_R, turn_x1, turn_y1, z_base);
+            site_set(REAR_R, turn_x0, turn_y0, z_base);
+            site_set(FRONT_L, turn_x1, turn_y1, z_base);
+            site_set(REAR_L, turn_x0, turn_y0, z_base);
+            site_wait_all();
+            site_set(REAR_R, turn_x0, turn_y0, z_up);
+            site_wait_all();
+            site_set(FRONT_R, x_base, y_base, z_base);
+            site_set(REAR_R, x_base, y_base, z_up);
+            site_set(FRONT_L, x_base, y_base + y_step, z_base);
+            site_set(REAR_L, x_base, y_base + y_step, z_base);
+            site_wait_all();
+            site_set(REAR_R, x_base, y_base, z_base);
+            site_wait_all();
+        } else {
+            // Gerak kaki depan kanan dan depan kiri
+            site_set(FRONT_R, x_base, y_base, z_up);
+            site_wait_all();
+            site_set(FRONT_R, turn_x0, turn_y0, z_up);
+            site_set(REAR_R, turn_x1, turn_y1, z_base);
+            site_set(FRONT_L, turn_x0, turn_y0, z_base);
+            site_set(REAR_L, turn_x1, turn_y1, z_base);
+            site_wait_all();
+            site_set(FRONT_R, turn_x0, turn_y0, z_base);
+            site_wait_all();
+            site_set(FRONT_R, turn_x0, turn_y0, z_base);
+            site_set(REAR_R, turn_x1, turn_y1, z_base);
+            site_set(FRONT_L, turn_x0, turn_y0, z_base);
+            site_set(REAR_L, turn_x1, turn_y1, z_base);
+            site_wait_all();
+            site_set(FRONT_L, turn_x0, turn_y0, z_up);
+            site_wait_all();
+            site_set(FRONT_R, x_base, y_base + y_step, z_base);
+            site_set(REAR_R, x_base, y_base + y_step, z_base);
+            site_set(FRONT_L, x_base, y_base, z_up);
+            site_set(REAR_L, x_base, y_base, z_base);
+            site_wait_all();
+            site_set(FRONT_L, x_base, y_base, z_base);
+            site_wait_all();
+        }
+    }
+}
+
+void gait_turn_right(uint8_t step) {
+    Serial.print("Turn Right for ");
+    Serial.print(step);
+    Serial.println(" step");
+
+    move_speed = spot_turn_speed;
+    while (step-- > 0) {
+        if (site_now[FRONT_L][1] == y_base) {
+            // Gerak kaki depan kiri dan depan kanan
+            site_set(FRONT_L, x_base, y_base, z_up);
+            site_wait_all();
+            site_set(FRONT_R, turn_x0, turn_y0, z_base);
+            site_set(REAR_R, turn_x1, turn_y1, z_base);
+            site_set(FRONT_L, turn_x0, turn_y0, z_up);
+            site_set(REAR_L, turn_x1, turn_y1, z_base);
+            site_wait_all();
+            site_set(FRONT_L, turn_x0, turn_y0, z_base);
+            site_wait_all();
+            site_set(FRONT_R, turn_x0, turn_y0, z_base);
+            site_set(REAR_R, turn_x1, turn_y1, z_base);
+            site_set(FRONT_L, turn_x0, turn_y0, z_base);
+            site_set(REAR_L, turn_x1, turn_y1, z_base);
+            site_wait_all();
+            site_set(FRONT_R, turn_x0, turn_y0, z_up);
+            site_wait_all();
+            site_set(FRONT_R, x_base, y_base, z_up);
+            site_set(REAR_R, x_base, y_base, z_base);
+            site_set(FRONT_L, x_base, y_base + y_step, z_base);
+            site_set(REAR_L, x_base, y_base + y_step, z_base);
+            site_wait_all();
+            site_set(FRONT_R, x_base, y_base, z_base);
+            site_wait_all();
+        } else {
+            // Gerak kaki belakang kanan dan belakang kiri
+            site_set(REAR_R, x_base, y_base, z_up);
+            site_wait_all();
+            site_set(FRONT_R, turn_x1, turn_y1, z_base);
+            site_set(REAR_R, turn_x0, turn_y0, z_up);
+            site_set(FRONT_L, turn_x1, turn_y1, z_base);
+            site_set(REAR_L, turn_x0, turn_y0, z_base);
+            site_wait_all();
+            site_set(REAR_R, turn_x0, turn_y0, z_base);
+            site_wait_all();
+            site_set(FRONT_R, turn_x1, turn_y1, z_base);
+            site_set(REAR_R, turn_x0, turn_y0, z_base);
+            site_set(FRONT_L, turn_x1, turn_y1, z_base);
+            site_set(REAR_L, turn_x0, turn_y0, z_base);
+            site_wait_all();
+            site_set(REAR_L, turn_x0, turn_y0, z_up);
+            site_wait_all();
+            site_set(FRONT_R, x_base, y_base + y_step, z_base);
+            site_set(REAR_R, x_base, y_base + y_step, z_base);
+            site_set(FRONT_L, x_base, y_base, z_base);
+            site_set(REAR_L, x_base, y_base, z_up);
+            site_wait_all();
+            site_set(REAR_L, x_base, y_base, z_base);
             site_wait_all();
         }
     }
