@@ -81,6 +81,7 @@ void servo_write(uint8_t leg, float coxa, float femur, float tibia);
 void cmd_init();
 void cmd_unknown();
 void cmd_set_servo(CommandParameter &params);
+void cmd_set_site(CommandParameter &params);
 
 void site_init();
 void site_set(uint8_t leg, float x, float y, float z);
@@ -154,6 +155,7 @@ void servo_write(uint8_t leg, float coxa, float femur, float tibia) {
 
 void cmd_init() {
     command.AddCommand(F("servo"), cmd_set_servo);
+    command.AddCommand(F("site"), cmd_set_site);
     command.SetDefaultHandler(cmd_unknown);
 
     command.AddVariable(F("site_timer_ms"), site_timer_ms);
@@ -196,6 +198,37 @@ void cmd_set_servo(CommandParameter &params) {
     }
 
     Serial.println();
+}
+
+void cmd_set_site(CommandParameter &params) {
+    int leg = params.NextParameterAsInteger();
+
+    if (leg < 0 || leg > 3) return;
+
+    Serial.print(F("Site "));
+    Serial.print(leg);
+
+    const int site[3] = {
+        params.NextParameterAsInteger(),
+        params.NextParameterAsInteger(),
+        params.NextParameterAsInteger(),
+    };  
+
+    for (uint8_t i = 0; i < 3; i++) {
+        if (site[i] > -100 &&  site[i] < 100) {
+            Serial.print(F(" "));
+            Serial.print(site[i]);
+        } else {
+            Serial.print(F(" KEEP"));
+        }
+    }
+    Serial.println();
+
+    float coxa, femur, tibia;
+
+    ik_cartesian_to_polar(femur, tibia, coxa, site[0], site[1], site[2]);
+    ik_polar_to_servo(leg, femur, tibia, coxa);
+    servo_write(leg, coxa, femur, tibia);
 }
 
 void site_init() {
