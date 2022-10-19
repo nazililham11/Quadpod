@@ -30,6 +30,13 @@ const uint8_t servo_pin[4][3] = {
     {PORT_F_7, PORT_F_6, PORT_F_5},   // Depan Kiri
     {PORT_B_7, PORT_B_6, PORT_B_5}};  // Belakang Kiri
 
+// Kalibrasi sudut servo
+uint8_t enable_servo_calib = 1;
+int8_t servo_calib[4][3] = {
+    { 0,   0, 10},  // Depan Kanan 
+    {-3,  -3,  0},  // Belakang Kanan 
+    { 0, -10,-10},  // Depan Kiri 
+    {-3,  -1, -3}}; // Belakang Kiri
 // Command
 CommandHandler<10, 30, 10> command(Serial, '[', ']');
 
@@ -87,6 +94,7 @@ void cmd_init();
 void cmd_unknown();
 void cmd_set_servo(CommandParameter &params);
 void cmd_set_site(CommandParameter &params);
+void cmd_set_servo_calib(CommandParameter &params);
 void cmd_gait_action(CommandParameter &params);
 void cmd_get_all_config(CommandParameter &params);
 void cmd_get_site(CommandParameter &params);
@@ -146,6 +154,11 @@ void servo_init() {
 }
 
 void servo_write(uint8_t leg, float coxa, float femur, float tibia) {
+    if (enable_servo_calib){
+        coxa = coxa + servo_calib[leg][0];
+        femur = femur + servo_calib[leg][1];
+        tibia = tibia + servo_calib[leg][2];
+    }
     servo[leg][0].write(coxa);
     servo[leg][1].write(femur);
     servo[leg][2].write(tibia);
@@ -154,10 +167,13 @@ void servo_write(uint8_t leg, float coxa, float femur, float tibia) {
 void cmd_init() {
     command.AddCommand(F("servo"), cmd_set_servo);
     command.AddCommand(F("site"), cmd_set_site);
+    command.AddCommand(F("servo_calib"), cmd_set_servo_calib);
     command.AddCommand(F("gait_action"), cmd_gait_action);
     command.AddCommand(F("config"), cmd_get_all_config);
     command.AddCommand(F("get_site"), cmd_get_site);
     command.SetDefaultHandler(cmd_unknown);
+
+    command.AddVariable(F("enable_servo_calib"), enable_servo_calib);
 
     command.AddVariable(F("site_timer_ms"), site_timer_ms);
 
@@ -230,6 +246,32 @@ void cmd_set_site(CommandParameter &params) {
     ik_cartesian_to_polar(femur, tibia, coxa, site[0], site[1], site[2]);
     ik_polar_to_servo(leg, femur, tibia, coxa);
     servo_write(leg, coxa, femur, tibia);
+}
+
+void cmd_set_servo_calib(CommandParameter &params) {
+    int leg = params.NextParameterAsInteger();
+
+    if (leg < 0 || leg > 3) return;
+
+    Serial.print(F("Servo Calib "));
+    Serial.print(leg);
+
+    const int value[3] = {
+        params.NextParameterAsInteger(),
+        params.NextParameterAsInteger(),
+        params.NextParameterAsInteger()
+    };
+
+    for (uint8_t i = 0; i < 3; i++) {
+        if (value[i] > -100 && value[i] < 100) {
+            servo_calib[leg][i] = value[i];
+            Serial.print(F(" "));
+            Serial.print(value[i]);
+        } else {
+            Serial.print(F(" KEEP"));
+        }
+    }
+    Serial.println();
 }
 
 void cmd_gait_action(CommandParameter &params) {
@@ -320,6 +362,16 @@ void cmd_get_site(CommandParameter &params) {
         Serial.print(F("["));
         for (uint8_t j = 0; j < 3; j++) {
             Serial.print(round(site_now[i][j]));
+            if (j < 2) Serial.print(F(","));
+        }
+        Serial.print(F("]"));
+        if (i < 3) Serial.print(F(","));
+    }
+    Serial.print(F("],\"calib\":["));
+    for (uint8_t i = 0; i < 4; i++) {
+        Serial.print(F("["));
+        for (uint8_t j = 0; j < 3; j++) {
+            Serial.print(servo_calib[i][j]);
             if (j < 2) Serial.print(F(","));
         }
         Serial.print(F("]"));
