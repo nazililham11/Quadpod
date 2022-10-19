@@ -31,7 +31,7 @@ const uint8_t servo_pin[4][3] = {
     {PORT_B_7, PORT_B_6, PORT_B_5}};  // Belakang Kiri
 
 // Command
-CommandHandler<> command(Serial, '[', ']');
+CommandHandler<10, 30, 10> command(Serial, '[', ']');
 
 // Posisi kaki
 float site_now[4][3];
@@ -88,6 +88,8 @@ void cmd_unknown();
 void cmd_set_servo(CommandParameter &params);
 void cmd_set_site(CommandParameter &params);
 void cmd_gait_action(CommandParameter &params);
+void cmd_get_all_config(CommandParameter &params);
+void cmd_get_site(CommandParameter &params);
 
 void site_init();
 void site_set(uint8_t leg, float x, float y, float z);
@@ -153,6 +155,8 @@ void cmd_init() {
     command.AddCommand(F("servo"), cmd_set_servo);
     command.AddCommand(F("site"), cmd_set_site);
     command.AddCommand(F("gait_action"), cmd_gait_action);
+    command.AddCommand(F("config"), cmd_get_all_config);
+    command.AddCommand(F("get_site"), cmd_get_site);
     command.SetDefaultHandler(cmd_unknown);
 
     command.AddVariable(F("site_timer_ms"), site_timer_ms);
@@ -259,7 +263,70 @@ void cmd_gait_action(CommandParameter &params) {
         case 4: gait_turn_left(step); break;
         case 5: gait_turn_right(step); break;
     }
+}
 
+void cmd_get_all_config(CommandParameter &params) {
+    Serial.print(F("{\"coxa_len\":"));
+    Serial.print(round(coxa_len));
+    Serial.print(F(",\"femur_len\":"));
+    Serial.print(round(femur_len));
+    Serial.print(F(",\"tibia_len\":"));
+    Serial.print(round(tibia_len));
+    Serial.print(F(",\"length_side\":"));
+    Serial.print(round(length_side));
+
+    Serial.print(F(",\"z_base\":"));
+    Serial.print(round(z_base));
+    Serial.print(F(",\"z_stand\":"));
+    Serial.print(round(z_stand));
+    Serial.print(F(",\"z_up\":"));
+    Serial.print(round(z_up));
+    Serial.print(F(",\"x_base\":"));
+    Serial.print(round(x_base));
+    Serial.print(F(",\"y_base\":"));
+    Serial.print(round(y_base));
+    Serial.print(F(",\"y_step\":"));
+    Serial.print(round(y_step));
+
+    Serial.print(F(",\"move_speed\":"));
+    Serial.print(round(move_speed));
+    Serial.print(F(",\"stand_seat_speed\":"));
+    Serial.print(round(stand_seat_speed));
+    Serial.print(F(",\"leg_move_speed\":"));
+    Serial.print(round(leg_move_speed));
+    Serial.print(F(",\"body_move_speed\":"));
+    Serial.print(round(body_move_speed));
+    Serial.print(F(",\"spot_turn_speed\":"));
+    Serial.print(round(spot_turn_speed));
+
+    Serial.println(F("}"));
+}
+
+void cmd_get_site(CommandParameter &params) {
+    Serial.print(F("{\"angle\":["));
+
+    for (uint8_t i = 0; i < 4; i++) {
+        Serial.print(F("["));
+        for (uint8_t j = 0; j < 3; j++) {
+            Serial.print(servo[i][j].read());
+            if (j < 2) Serial.print(F(","));
+        }
+        Serial.print(F("]"));
+        if (i < 3) Serial.print(F(","));
+    }
+
+    Serial.print(F("],\"site\":["));
+    for (uint8_t i = 0; i < 4; i++) {
+        Serial.print(F("["));
+        for (uint8_t j = 0; j < 3; j++) {
+            Serial.print(round(site_now[i][j]));
+            if (j < 2) Serial.print(F(","));
+        }
+        Serial.print(F("]"));
+        if (i < 3) Serial.print(F(","));
+    }
+
+    Serial.println(F("]}"));
 }
 
 void site_init() {
