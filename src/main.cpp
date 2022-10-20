@@ -33,12 +33,12 @@ const uint8_t servo_pin[4][3] = {
 // Kalibrasi sudut servo
 uint8_t enable_servo_calib = 1;
 int8_t servo_calib[4][3] = {
-    { 0,   0, 10},  // Depan Kanan 
-    {-3,  -3,  0},  // Belakang Kanan 
-    { 0, -10,-10},  // Depan Kiri 
-    {-3,  -1, -3}}; // Belakang Kiri
+    {-5,  0,  7},  // Depan Kanan 
+    {4,  -7, -4},  // Belakang Kanan 
+    {-4, -2, -5},  // Depan Kiri 
+    {0,   0, 10}}; // Belakang Kiri
 // Command
-CommandHandler<10, 30, 10> command(Serial, '[', ']');
+CommandHandler<10, 30, 20> command(Serial, '[', ']');
 
 // Posisi kaki
 float site_now[4][3];
@@ -183,8 +183,16 @@ void cmd_init() {
 
     command.AddVariable(F("z_base"), z_base);
     command.AddVariable(F("z_stand"), z_stand);
+    command.AddVariable(F("z_up"), z_up);
     command.AddVariable(F("x_base"), x_base);
     command.AddVariable(F("y_base"), y_base);
+    command.AddVariable(F("y_step"), y_step);
+
+    command.AddVariable(F("move_speed"), move_speed);
+    command.AddVariable(F("stand_seat_speed"), stand_seat_speed);
+    command.AddVariable(F("leg_move_speed"), leg_move_speed);
+    command.AddVariable(F("body_move_speed"), body_move_speed);
+    command.AddVariable(F("spot_turn_speed"), spot_turn_speed);
 }
 
 void cmd_unknown() { Serial.println(F("Unknown Command")); }
