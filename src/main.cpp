@@ -17,9 +17,26 @@
 #define TURN_LEFT 4
 #define TURN_RIGHT 5
 
+// ID Ultrasonic
+#define US_FRONT 0    // Depan
+#define US_FRONT_R 1  // Depan Kanan
+#define US_REAR_R 2   // Belakang Kanan
+#define US_FRONT_L 3  // Depan Kiri
+#define US_REAR_L 4   // Belakang Kiri
+
 // Enable Services
 #define ENABLE_SERVICES_PIN PORT_F_3
 bool enable_services = true;
+
+// Ultrasonic
+float us_distance[5];
+const uint8_t us_pin[5] = {
+    PORT_E_2,  // Depan
+    PORT_C_6,  // Depan Kanan
+    PORT_E_3,  // Belakang Kanan
+    PORT_C_7,  // Depan Kiri
+    PORT_E_4,  // Belakang Kiri
+};
 
 // Servo
 Servo servo[4][3];
@@ -33,10 +50,11 @@ const uint8_t servo_pin[4][3] = {
 // Kalibrasi sudut servo
 uint8_t enable_servo_calib = 1;
 int8_t servo_calib[4][3] = {
-    {-5,  0,  7},  // Depan Kanan 
-    {4,  -7, -4},  // Belakang Kanan 
-    {-4, -2, -5},  // Depan Kiri 
-    {0,   0, 10}}; // Belakang Kiri
+    {-5, 0, 7},    // Depan Kanan
+    {4, -7, -4},   // Belakang Kanan
+    {-4, -2, -5},  // Depan Kiri
+    {0, 0, 10}};   // Belakang Kiri
+
 // Command
 CommandHandler<10, 30, 20> command(Serial, '[', ']');
 
@@ -83,38 +101,43 @@ const float turn_x0 = turn_x1 - temp_b * cos(temp_alpha);
 const float turn_y0 = temp_b * sin(temp_alpha) - turn_y1 - length_side;
 
 // Task Timer
-uint16_t site_timer_ms = 20;
+uint32_t site_timer_ms = 20;  // Site Timer
 unsigned long site_timer;
+uint32_t us_timer_ms = 1000;  // Ultrasonic Timer
+unsigned long us_timer;
 
 // Function
 void servo_init();
-void servo_write(uint8_t leg, float coxa, float femur, float tibia);
+void servo_write(uint8_t, float, float, float);
+
+void us_refresh(uint8_t);
+void us_refresh_all();
 
 void cmd_init();
 void cmd_unknown();
-void cmd_set_servo(CommandParameter &params);
-void cmd_set_site(CommandParameter &params);
-void cmd_set_servo_calib(CommandParameter &params);
-void cmd_gait_action(CommandParameter &params);
-void cmd_get_all_config(CommandParameter &params);
-void cmd_get_site(CommandParameter &params);
+void cmd_set_servo(CommandParameter &);
+void cmd_set_site(CommandParameter &);
+void cmd_set_servo_calib(CommandParameter &);
+void cmd_gait_action(CommandParameter &);
+void cmd_get_all_config(CommandParameter &);
+void cmd_get_site(CommandParameter &);
+void cmd_get_us(CommandParameter &);
 
 void site_init();
-void site_set(uint8_t leg, float x, float y, float z);
+void site_set(uint8_t, float, float, float);
 void site_services();
-void site_wait(uint8_t leg);
+void site_wait(uint8_t);
 void site_wait_all();
 
-void ik_polar_to_servo(uint8_t leg, float &alpha, float &beta, float &gamma);
-void ik_cartesian_to_polar(float &alpha, float &beta, float &gamma, float x,
-                           float y, float z);
+void ik_polar_to_servo(uint8_t, float &, float &, float &);
+void ik_cartesian_to_polar(float &, float &, float &, float, float, float);
 
 void gait_sit();
 void gait_stand();
-void gait_move_forward(uint8_t step);
-void gait_move_backward(uint8_t step);
-void gait_turn_left(uint8_t step);
-void gait_turn_right(uint8_t step);
+void gait_move_forward(uint8_t);
+void gait_move_backward(uint8_t);
+void gait_turn_left(uint8_t);
+void gait_turn_right(uint8_t);
 
 void setup() {
     Serial.begin(115200);
@@ -133,15 +156,37 @@ void setup() {
 
 void loop() {
     if (enable_services) {
-        gait_sit();
-        gait_stand();
-        gait_move_forward(10);
-        gait_move_backward(10);
-        gait_turn_left(10);
-        gait_turn_right(10);
+        unsigned long currentTime = millis();
+        if (currentTime - site_timer > site_timer_ms) {
+            site_timer = currentTime;
+            site_services();
+        }
+        if (currentTime - us_timer > us_timer_ms) {
+            site_timer = currentTime;
+            us_refresh_all();
+        }
     }
 
     command.Process();
+}
+
+void us_refresh(uint8_t us_id) {
+    pinMode(us_pin[us_id], OUTPUT);
+
+    digitalWrite(us_pin[us_id], HIGH);
+    delayMicroseconds(10);
+    digitalWrite(us_pin[us_id], LOW);
+
+    pinMode(us_pin[us_id], INPUT);
+
+    us_distance[us_id] = pulseIn(us_pin[us_id], HIGH);
+    us_distance[us_id] = (us_distance[us_id] / 2.0) / 29.1;
+}
+
+void us_refresh_all() {
+    for (uint8_t i = 0; i < 5; i++) {
+        us_refresh(i);
+    }
 }
 
 void servo_init() {
@@ -154,7 +199,7 @@ void servo_init() {
 }
 
 void servo_write(uint8_t leg, float coxa, float femur, float tibia) {
-    if (enable_servo_calib){
+    if (enable_servo_calib) {
         coxa = coxa + servo_calib[leg][0];
         femur = femur + servo_calib[leg][1];
         tibia = tibia + servo_calib[leg][2];
@@ -171,11 +216,13 @@ void cmd_init() {
     command.AddCommand(F("gait_action"), cmd_gait_action);
     command.AddCommand(F("config"), cmd_get_all_config);
     command.AddCommand(F("get_site"), cmd_get_site);
+    command.AddCommand(F("get_us"), cmd_get_us);
     command.SetDefaultHandler(cmd_unknown);
 
     command.AddVariable(F("enable_servo_calib"), enable_servo_calib);
 
     command.AddVariable(F("site_timer_ms"), site_timer_ms);
+    command.AddVariable(F("us_timer_ms"), us_timer_ms);
 
     command.AddVariable(F("coxa_len"), coxa_len);
     command.AddVariable(F("femur_len"), femur_len);
@@ -387,6 +434,15 @@ void cmd_get_site(CommandParameter &params) {
     }
 
     Serial.println(F("]}"));
+}
+
+void cmd_get_us(CommandParameter &params) {
+    Serial.print("{\"us\":[");
+    for (uint8_t i = 0; i < 5; i++) {
+        Serial.print(us_distance[i]);
+        if (i < 4) Serial.print(",");
+    }
+    Serial.println("]}");
 }
 
 void site_init() {
