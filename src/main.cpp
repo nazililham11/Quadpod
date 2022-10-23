@@ -24,6 +24,11 @@
 #define US_FRONT_L 3  // Depan Kiri
 #define US_REAR_L 4   // Belakang Kiri
 
+// ID Command info
+# define VAL_ANGLE 0
+# define VAL_SITE 1
+# define VAL_CALIB 2
+
 // Enable Services
 #define ENABLE_SERVICES_PIN PORT_F_3
 bool enable_services = true;
@@ -32,9 +37,9 @@ bool enable_services = true;
 float us_distance[5];
 const uint8_t us_pin[5] = {
     PORT_E_2,  // Depan
-    PORT_C_6,  // Depan Kanan
-    PORT_E_3,  // Belakang Kanan
-    PORT_C_7,  // Depan Kiri
+    PORT_C_7,  // Depan Kanan
+    PORT_C_6,  // Belakang Kanan
+    PORT_E_3,  // Depan Kiri
     PORT_E_4,  // Belakang Kiri
 };
 
@@ -115,12 +120,10 @@ void us_refresh_all();
 
 void cmd_init();
 void cmd_unknown();
-void cmd_set_servo(CommandParameter &);
-void cmd_set_site(CommandParameter &);
-void cmd_set_servo_calib(CommandParameter &);
+void cmd_set_leg(CommandParameter &);
 void cmd_gait_action(CommandParameter &);
-void cmd_get_all_config(CommandParameter &);
-void cmd_get_site(CommandParameter &);
+void cmd_get_config(CommandParameter &);
+void cmd_get_leg(CommandParameter &);
 void cmd_get_us(CommandParameter &);
 
 void site_init();
@@ -210,12 +213,10 @@ void servo_write(uint8_t leg, float coxa, float femur, float tibia) {
 }
 
 void cmd_init() {
-    command.AddCommand(F("servo"), cmd_set_servo);
-    command.AddCommand(F("site"), cmd_set_site);
-    command.AddCommand(F("servo_calib"), cmd_set_servo_calib);
-    command.AddCommand(F("gait_action"), cmd_gait_action);
-    command.AddCommand(F("config"), cmd_get_all_config);
-    command.AddCommand(F("get_site"), cmd_get_site);
+    command.AddCommand(F("set_leg"), cmd_set_leg);
+    command.AddCommand(F("gait_act"), cmd_gait_action);
+    command.AddCommand(F("get_cfg"), cmd_get_config);
+    command.AddCommand(F("get_leg"), cmd_get_leg);
     command.AddCommand(F("get_us"), cmd_get_us);
     command.SetDefaultHandler(cmd_unknown);
 
@@ -235,7 +236,6 @@ void cmd_init() {
     command.AddVariable(F("y_base"), y_base);
     command.AddVariable(F("y_step"), y_step);
 
-    command.AddVariable(F("move_speed"), move_speed);
     command.AddVariable(F("stand_seat_speed"), stand_seat_speed);
     command.AddVariable(F("leg_move_speed"), leg_move_speed);
     command.AddVariable(F("body_move_speed"), body_move_speed);
@@ -244,89 +244,64 @@ void cmd_init() {
 
 void cmd_unknown() { Serial.println(F("Unknown Command")); }
 
-void cmd_set_servo(CommandParameter &params) {
-    int leg = params.NextParameterAsInteger();
+void cmd_set_leg(CommandParameter &params) {
+    const int values_id = params.NextParameterAsInteger();
+    const int leg_id = params.NextParameterAsInteger();
 
-    if (leg < 0 || leg > 3) return;
+    if (values_id < 0 || values_id > 2) return;
+    if (leg_id < 0 || leg_id > 3) return;
+
+    int values[3] = {
+        params.NextParameterAsInteger(),
+        params.NextParameterAsInteger(),
+        params.NextParameterAsInteger(),
+    };
+
+    bool is_valid[3];
+    for (uint8_t i = 0; i < 3; i++) {
+        if (values_id == VAL_ANGLE) {
+            is_valid[i] = values[i] >= 0 && values[i] < 180;
+            values[i] = is_valid[i] ? values[i] : servo[leg_id][i].read();
+        } else if (values_id == VAL_SITE) {
+            is_valid[i] = values[i] > -100 && values[i] < 100;
+            values[i] = is_valid[i] ? values[i] : KEEP;
+        } else if (values_id == VAL_CALIB) {
+            is_valid[i] = values[i] > -180 && values[i] < 180;
+            values[i] = is_valid[i] ? values[i] : servo_calib[leg_id][i];
+        }
+    }
 
     Serial.print(F("Leg "));
-    Serial.print(leg);
-
-    const int angle[3] = {
-        params.NextParameterAsInteger(),
-        params.NextParameterAsInteger(),
-        params.NextParameterAsInteger(),
-    };
-
+    Serial.print(leg_id);
+    
+    switch (values_id) {
+        case VAL_ANGLE: Serial.print(F(" Angle ")); break;
+        case VAL_SITE: Serial.print(F(" Site ")); break;
+        case VAL_CALIB: Serial.print(F(" Calib ")); break;
+    }
+    
     for (uint8_t i = 0; i < 3; i++) {
-        if (angle[i] < 0) return;
-        if (angle[i] < 180) {
-            servo[leg][i].write(angle[i]);
-            Serial.print(F(" "));
-            Serial.print(angle[i]);
-        } else {
-            Serial.print(F(" KEEP"));
-        }
+        Serial.print(F(" "));
+        if (is_valid[i]) Serial.print(values[i]);
+        else Serial.print(F(" KEEP"));
     }
 
     Serial.println();
-}
 
-void cmd_set_site(CommandParameter &params) {
-    int leg = params.NextParameterAsInteger();
-
-    if (leg < 0 || leg > 3) return;
-
-    Serial.print(F("Site "));
-    Serial.print(leg);
-
-    const int site[3] = {
-        params.NextParameterAsInteger(),
-        params.NextParameterAsInteger(),
-        params.NextParameterAsInteger(),
-    };
-
-    for (uint8_t i = 0; i < 3; i++) {
-        if (site[i] > -100 && site[i] < 100) {
-            Serial.print(F(" "));
-            Serial.print(site[i]);
-        } else {
-            Serial.print(F(" KEEP"));
+    if (values_id == VAL_SITE) {
+        float coxa, femur, tibia;
+        ik_cartesian_to_polar(femur, tibia, coxa, values[0], values[1], values[2]);
+        ik_polar_to_servo(leg_id, femur, tibia, coxa);
+        servo_write(leg_id, coxa, femur, tibia);
+    } else {
+        for (uint8_t i = 0; i < 3; i++) {
+            if (values_id == VAL_ANGLE) {
+                servo[leg_id][i].write(values[i]);
+            } else if (values_id == VAL_CALIB) {
+                servo_calib[leg_id][i] = values[i];   
+            }
         }
     }
-    Serial.println();
-
-    float coxa, femur, tibia;
-
-    ik_cartesian_to_polar(femur, tibia, coxa, site[0], site[1], site[2]);
-    ik_polar_to_servo(leg, femur, tibia, coxa);
-    servo_write(leg, coxa, femur, tibia);
-}
-
-void cmd_set_servo_calib(CommandParameter &params) {
-    int leg = params.NextParameterAsInteger();
-
-    if (leg < 0 || leg > 3) return;
-
-    Serial.print(F("Servo Calib "));
-    Serial.print(leg);
-
-    const int value[3] = {
-        params.NextParameterAsInteger(),
-        params.NextParameterAsInteger(),
-        params.NextParameterAsInteger()
-    };
-
-    for (uint8_t i = 0; i < 3; i++) {
-        if (value[i] > -100 && value[i] < 100) {
-            servo_calib[leg][i] = value[i];
-            Serial.print(F(" "));
-            Serial.print(value[i]);
-        } else {
-            Serial.print(F(" KEEP"));
-        }
-    }
-    Serial.println();
 }
 
 void cmd_gait_action(CommandParameter &params) {
@@ -362,7 +337,7 @@ void cmd_gait_action(CommandParameter &params) {
     }
 }
 
-void cmd_get_all_config(CommandParameter &params) {
+void cmd_get_config(CommandParameter &params) {
     Serial.print(F("{\"coxa_len\":"));
     Serial.print(round(coxa_len));
     Serial.print(F(",\"femur_len\":"));
@@ -399,43 +374,6 @@ void cmd_get_all_config(CommandParameter &params) {
     Serial.println(F("}"));
 }
 
-void cmd_get_site(CommandParameter &params) {
-    Serial.print(F("{\"angle\":["));
-
-    for (uint8_t i = 0; i < 4; i++) {
-        Serial.print(F("["));
-        for (uint8_t j = 0; j < 3; j++) {
-            Serial.print(servo[i][j].read());
-            if (j < 2) Serial.print(F(","));
-        }
-        Serial.print(F("]"));
-        if (i < 3) Serial.print(F(","));
-    }
-
-    Serial.print(F("],\"site\":["));
-    for (uint8_t i = 0; i < 4; i++) {
-        Serial.print(F("["));
-        for (uint8_t j = 0; j < 3; j++) {
-            Serial.print(round(site_now[i][j]));
-            if (j < 2) Serial.print(F(","));
-        }
-        Serial.print(F("]"));
-        if (i < 3) Serial.print(F(","));
-    }
-    Serial.print(F("],\"calib\":["));
-    for (uint8_t i = 0; i < 4; i++) {
-        Serial.print(F("["));
-        for (uint8_t j = 0; j < 3; j++) {
-            Serial.print(servo_calib[i][j]);
-            if (j < 2) Serial.print(F(","));
-        }
-        Serial.print(F("]"));
-        if (i < 3) Serial.print(F(","));
-    }
-
-    Serial.println(F("]}"));
-}
-
 void cmd_get_us(CommandParameter &params) {
     Serial.print("{\"us\":[");
     for (uint8_t i = 0; i < 5; i++) {
@@ -443,6 +381,34 @@ void cmd_get_us(CommandParameter &params) {
         if (i < 4) Serial.print(",");
     }
     Serial.println("]}");
+}
+
+void cmd_get_leg(CommandParameter &params) {
+    const int values_id = params.NextParameterAsInteger();
+    if (values_id < 0 || values_id > 2) return;
+
+    Serial.print(F("{\""));
+    switch (values_id) {
+        case VAL_ANGLE: Serial.print(F("angle")); break;
+        case VAL_SITE: Serial.print(F("site")); break;
+        case VAL_CALIB: Serial.print(F("calib")); break;
+    }
+    Serial.print(F("\":["));
+
+    for (uint8_t i = 0; i < 4; i++) {
+        Serial.print(F("["));
+        for (uint8_t j = 0; j < 3; j++) {
+            switch (values_id) {
+                case VAL_ANGLE: Serial.print(servo[i][j].read()); break;
+                case VAL_SITE: Serial.print(round(site_now[i][j])); break;
+                case VAL_CALIB: Serial.print(servo_calib[i][j]); break;
+            }
+            if (j < 2) Serial.print(F(","));
+        }
+        Serial.print(F("]"));
+        if (i < 3) Serial.print(F(","));
+    }
+    Serial.println(F("]}"));
 }
 
 void site_init() {
