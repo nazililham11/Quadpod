@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <CommandHandler.h>
 #include <Servo.h>
+#include <NewPing.h>
 
 // ID kaki
 #define FRONT_R 0  // Depan Kanan
@@ -24,6 +25,9 @@
 #define US_FRONT_L 3  // Depan Kiri
 #define US_REAR_L 4   // Belakang Kiri
 
+#define PING_MEDIAN 5    // Banyak penbacaan sensor untuk diambil nilai median
+#define MAX_DISTANCE 400 // Jarak max ultrasonic (cm)
+
 // ID Command info
 # define VAL_ANGLE 0
 # define VAL_SITE 1
@@ -34,13 +38,13 @@
 bool enable_services = true;
 
 // Ultrasonic
-float us_distance[5];
-const uint8_t us_pin[5] = {
-    PORT_E_2,  // Depan
-    PORT_C_7,  // Depan Kanan
-    PORT_C_6,  // Belakang Kanan
-    PORT_E_3,  // Depan Kiri
-    PORT_E_4,  // Belakang Kiri
+uint16_t us_distance[5];
+NewPing sonar[5] = {
+    NewPing(PORT_E_2, PORT_E_2, MAX_DISTANCE),  // Depan
+    NewPing(PORT_C_7, PORT_C_7, MAX_DISTANCE),  // Depan Kanan
+    NewPing(PORT_C_6, PORT_C_6, MAX_DISTANCE),  // Belakang Kanan
+    NewPing(PORT_E_3, PORT_E_3, MAX_DISTANCE),  // Depan Kiri
+    NewPing(PORT_E_4, PORT_E_4, MAX_DISTANCE)   // Belakang Kiri
 };
 
 // Servo
@@ -144,7 +148,7 @@ void gait_turn_right(uint8_t);
 
 void setup() {
     Serial.begin(115200);
-    Serial.println("Setup");
+    Serial.println(F("Setup"));
 
     pinMode(ENABLE_SERVICES_PIN, INPUT_PULLUP);
 
@@ -154,7 +158,11 @@ void setup() {
 
     enable_services = digitalRead(ENABLE_SERVICES_PIN);
 
-    Serial.println("Setup Done");
+    Serial.println(F("Setup Done"));
+
+    Serial.print(F("Services "));
+    if (enable_services) Serial.println(F("Enabled"));
+    else Serial.println(F("Disabled"));
 }
 
 void loop() {
@@ -174,16 +182,9 @@ void loop() {
 }
 
 void us_refresh(uint8_t us_id) {
-    pinMode(us_pin[us_id], OUTPUT);
-
-    digitalWrite(us_pin[us_id], HIGH);
-    delayMicroseconds(10);
-    digitalWrite(us_pin[us_id], LOW);
-
-    pinMode(us_pin[us_id], INPUT);
-
-    us_distance[us_id] = pulseIn(us_pin[us_id], HIGH);
-    us_distance[us_id] = (us_distance[us_id] / 2.0) / 29.1;
+    delay(50);
+    us_distance[us_id] = sonar[us_id].ping_median(PING_MEDIAN);
+    us_distance[us_id] = sonar[us_id].convert_cm(us_distance[us_id]);
 }
 
 void us_refresh_all() {
@@ -375,6 +376,10 @@ void cmd_get_config(CommandParameter &params) {
 }
 
 void cmd_get_us(CommandParameter &params) {
+    int is_refresh = params.NextParameterAsInteger(0);
+    if (is_refresh != 0) 
+        us_refresh_all();
+    
     Serial.print("{\"us\":[");
     for (uint8_t i = 0; i < 5; i++) {
         Serial.print(us_distance[i]);
