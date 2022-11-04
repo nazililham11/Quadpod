@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+
+    body {
+        @apply bg-gray-50
+    }
+    hr {
+        @apply w-full border-b border-b-blue-600
+    }
+    h4 {
+        @apply text-blue-600 text-xl
+    }
+    span {
+        @apply text-gray-700
+    }
+    section {
+        @apply container flex flex-wrap py-16
+    }
+    
+    /* Navbar */
+    .navbar {
+        z-index: 9999;
+        @apply fixed w-full bg-white flex shadow-md shadow-gray-300 items-stretch
+    }
+    .navbar > a {
+        @apply px-6 py-2 flex-1 text-center leading-tight uppercase 
+            bg-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-300
+    }
+    .navbar > a.active {
+        @apply font-semibold border-blue-600
+            border-b-4 
+    }
+    .navbar > a.disabled, .navbar > a:disabled, .navbar > a[disabled=true] {
+        @apply pointer-events-none opacity-60
+    }
+    .container {
+        @apply mx-auto
+    }
+    
+    /* Card */
+    .card {
+        @apply bg-white rounded-lg shadow-lg border border-blue-600
+    }
+    .card.flex {
+        @apply flex-wrap items-center p-4 gap-4
+    }
+    
+    /* Table */
+    table {
+        @apply min-w-full
+    }
+    th {
+        @apply font-medium
+    }
+    thead {
+        @apply border-b border-blue-600
+    }
+    tr:not(:last-child) {
+        @apply border-b
+    }
+    td {
+        @apply text-sm text-gray-900 px-6 py-2 whitespace-nowrap
+    }
+    th {
+        @apply text-sm text-gray-900 px-6 py-2 text-left
+    }
+    
+    /* Button */
+    button {
+        @apply px-6 py-2 text-xs inline-block leading-tight rounded shadow-md 
+        bg-blue-600 text-white 
+        hover:bg-blue-700 hover:shadow-lg 
+            focus:bg-blue-700 focus:shadow-lg focus:outline-none focus:ring-0 
+            active:bg-blue-800 active:shadow-lg transition duration-150 ease-in-out
+    }
+    button.disabled, button:disabled, button[disabled=true] {
+        @apply pointer-events-none opacity-60
+    }
+    button.red {
+        @apply bg-red-600 text-white 
+        hover:bg-red-700 hover:shadow-lg 
+        focus:bg-red-700 focus:shadow-lg focus:outline-none focus:ring-0 
+        active:bg-red-800 active:shadow-lg transition duration-150 ease-in-out
+    }
+    button.btn-sm {
+        @apply px-4 py-1.5 text-xs
+    }
+    button.btn-lg {
+        @apply px-7 py-3 text-sm
+    }
+    
+    /* Input */
+    input[type=number], input[type=text] {
+        @apply block px-3 py-1.5 text-base font-normal text-gray-700
+            bg-white bg-clip-padding border border-solid border-gray-300
+            rounded transition ease-in-out m-0
+            focus:text-gray-700 focus:bg-white focus:border-blue-600 focus:outline-none
+    }
+    input[type=number].form-lg, input[type=text].form-lg {
+        @apply px-4 py-2 text-xl
+    }
+    input[type=number].form-sm, input[type=text].form-sm {
+        @apply px-2 py-1 text-sm
+    }
+    input[type=checkbox] {
+        @apply appearance-none w-6 h-6 rounded float-left align-top 
+            bg-white bg-no-repeat bg-contain focus:outline-none cursor-pointer shadow-sm
+    } 
+
+    select {
+        @apply appearance-none block pl-3 pr-8 py-1.5 text-base font-normal text-gray-700
+            bg-white bg-clip-padding bg-no-repeat border border-solid border-gray-300 rounded
+            focus:text-gray-700 focus:bg-white focus:border-blue-600 focus:outline-none
+            transition ease-in-out m-0
+    }
+
+
+    /* List */
+    ul.list > li {
+        @apply text-sm text-gray-700 text-left px-6 py-2 border-b border-gray-200 w-full cursor-pointer
+            hover:bg-gray-200 hover:text-gray-500
+            focus:outline-none focus:ring-0 focus:bg-gray-200 focus:text-gray-600
+            transition duration-500 
+    }
+}

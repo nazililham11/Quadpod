@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="app">
+
+        <!-- Navbar -->
+        <div class="navbar">
+            <a href="#" v-for="(_tab, _index) in Tabs" :key="_index" :class="{ 'active': active_tab === _tab }"
+                :disabled="!serial.is_open" @click="active_tab = _tab">
+                {{ _tab }}
+            </a>
+        </div>
+
+        <!-- Connection -->
+        <section v-show="active_tab == 'connection'">
+            <!-- Baud Rate -->
+            <div class="flex items-center gap-4 mb-4">
+                <span>Baud Rate</span>
+                <select v-model="serial.baud_rate" :disabled="serial.is_open">
+                    <option v-for="(_br, index) in BaudRateList" :key="index" :value="_br">{{ _br }}</option>
+                </select>
+            </div>
+
+            <!-- Close Serial / Refresh Button -->
+            <div class="flex items-center gap-4 ml-auto mb-4">
+                <span v-if="serial.active.friendlyName" v-show="serial.is_open">
+                    {{ serial.active.friendlyName }}</span>
+                <button class="red" @click="closeSerial" v-show="serial.is_open">Close Serial</button>
+                <button @click="listPorts">Refresh</button>
+            </div>
+
+            <!-- Serial List Table -->
+            <div class="card p-4 w-full">
+                <table>
+                    <thead>
+                        <th>Port</th>
+                        <th>Name</th>
+                        <th>Manufacturer</th>
+                        <th></th>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(_serial, _index) in serial.list" :key="_index">
+                            <td>{{ _serial.path }}</td>
+                            <td>{{ _serial.friendlyName }}</td>
+                            <td>{{ _serial.manufacturer }}</td>
+                            <td>
+                                <button class="btn-sm" :disabled="serial.is_open"
+                                    @click="openSerial(_serial)">Open</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Servo -->
+        <section v-show="active_tab == 'servo'">
+            <div class="flex w-full justify-between p-2 gap-4">
+                <label>
+                    <input type="checkbox" v-model="is_apply_calib">
+                    <span class="ml-4">Apply Servo Calibration</span>
+                </label>
+                <button @click="refreshValues('servo')">Refresh</button>
+            </div>
+            <div class="flex w-full md:w-1/2 p-2" v-for="(_leg, index) in LegTitle" :key="index">
+                <div class="card flex justify-between">
+                    <h4>{{ _leg.title }}</h4>
+                    <button class="ml-auto" @click="servoDefault(_leg.id)">Default</button>
+                    <hr>
+
+                    <label class="min-w-0">Coxa</label>
+                    <input class="form-sm min-w-0" type="number" v-model="servo[_leg.id][0]"
+                        @keyup.enter="applyServoAngle(_leg.id)" />
+                    <input type="range" min="0" max="180" value="90" class="w-full mb-4"
+                        @change="applyServoAngle(_leg.id)" v-model="servo[_leg.id][0]" />
+
+                    <label class="min-w-0">Femur</label>
+                    <input class="form-sm min-w-0" type="number" v-model="servo[_leg.id][1]"
+                        @keyup.enter="applyServoAngle(_leg.id)" />
+                    <input type="range" min="0" max="180" value="90" class="w-full mb-4"
+                        @change="applyServoAngle(_leg.id)" v-model="servo[_leg.id][1]" />
+
+                    <label class="min-w-0">Tibia</label>
+                    <input class="form-sm min-w-0" type="number" v-model="servo[_leg.id][2]"
+                        @keyup.enter="applyServoAngle(_leg.id)" />
+                    <input type="range" min="0" max="180" value="90" class="w-full mb-4"
+                        @change="applyServoAngle(_leg.id)" v-model="servo[_leg.id][2]" />
+                </div>
+            </div>
+        </section>
+
+        <!-- Site -->
+        <section v-show="active_tab == 'leg'">
+            <div class="flex w-full justify-end p-2">
+                <button @click="refreshValues('site')">Refresh</button>
+            </div>
+            <div class="flex w-full md:w-1/2 p-2" v-for="(_leg, index) in LegTitle" :key="index">
+                <div class="card flex justify-between">
+                    <h4>{{ _leg.title }}</h4>
+                    <button class="ml-auto" @click="siteDefault(_leg.id)">Default</button>
+                    <hr>
+                    <label class="min-w-0">X</label>
+                    <input class="form-sm min-w-0" type="number" v-model="site[_leg.id][0]"
+                        @keyup.enter="applySite(_leg.id)" />
+                    <input type="range" min="-100" max="100" value="0" class="w-full mb-4" v-model="site[_leg.id][0]"
+                        @change="applySite(_leg.id)" />
+
+                    <label class="min-w-0">Y</label>
+                    <input class="form-sm min-w-0" type="number" v-model="site[_leg.id][1]"
+                        @keyup.enter="applySite(_leg.id)" />
+                    <input type="range" min="-100" max="100" value="0" class="w-full mb-4" v-model="site[_leg.id][1]"
+                        @change="applySite(_leg.id)" />
+
+                    <label class="min-w-0">Z</label>
+                    <input class="form-sm min-w-0" type="number" v-model="site[_leg.id][2]"
+                        @keyup.enter="applySite(_leg.id)" />
+                    <input type="range" min="-100" max="100" value="0" class="w-full mb-4" v-model="site[_leg.id][2]"
+                        @change="applySite(_leg.id)" />
+                </div>
+            </div>
+        </section>
+
+        <!-- Actions -->
+        <section v-show="active_tab == 'actions'">
+            <div class="card flex justify-start w-1/2 my-2">
+                <h4>Gait</h4>
+                <hr>
+                <div class="flex w-full gap-4">
+                    <span>Step</span>
+                    <input type="range" min="1" max="20" class="flex-auto" v-model="gait_step" />
+                    <span>{{ gait_step }}</span>
+                </div>
+                
+                <button @click="gaitAction('sit')">Sit</button>
+                <button @click="gaitAction('stand')">Stand</button>
+                <button @click="gaitAction('move_forward')">Move Forward ({{ gait_step }}x)</button>
+                <button @click="gaitAction('move_backward')">Move Backward ({{ gait_step }}x)</button>
+                <button @click="gaitAction('turn_left')">Turn Left ({{ gait_step }}x)</button>
+                <button @click="gaitAction('turn_right')">Turn Right ({{ gait_step }}x)</button>
+            </div>
+        </section>
+
+        <!-- Sensor -->
+        <section v-show="active_tab == 'sensors'">
+            <div class="flex w-full justify-end p-2">
+                <button @click="refreshValues('ultrasonic')">Refresh</button>
+            </div>
+            <div class="card flex w-full justify-between my-2">
+                <h4>Ultrasonic</h4>
+                <hr>
+
+                <span>Auto Referesh</span>
+                <select class="flex-auto" v-model="ultrasonic.update_interval"
+                    :disabled="ultrasonic.enable_auto_update">
+                    <option v-for="(_item, index) in UltrasonicUpdateInterval" :key="index" :value="_item">
+                        {{ _item }}
+                    </option>
+                </select>
+
+                <button @click="changeUsAutoUpdate(true)" v-show="!ultrasonic.enable_auto_update">
+                    Auto Refresh</button>
+                <button @click="changeUsAutoUpdate(false)" v-show="ultrasonic.enable_auto_update" class="red">
+                    Stop Auto Refresh</button>
+
+                <hr>
+                <div class="flex w-full" v-for="(_us, index) in UltrasonicTitle" :key="index">
+                    <label class="w-1/2">{{ _us.title }}</label>
+                    <input class="w-1/2" type="number" readonly v-if="ultrasonic.distance[index] !== undefinied"
+                        v-model="ultrasonic.distance[index]">
+                </div>
+            </div>
+        </section>
+
+        <!-- Config -->
+        <section v-show="active_tab == 'config'">
+            <div class="flex w-full justify-end p-2">
+                <button @click="refreshValues('config')">Refresh</button>
+            </div>
+            <div class="card flex w-full justify-between my-2" v-for="(_config, config_index) in ConfigTitle"
+                :key="config_index">
+
+                <h4>{{ _config.title }}</h4>
+                <button @click="applyConfig(_config)">Apply</button>
+                <hr>
+
+                <template v-if="_config.type == 'table'">
+                    <div class="flex flex-wrap items-center gap-4 justify-between w-full"
+                        v-for="(_row, row_index) in _config.rows" :key="row_index">
+
+                        <div class="flex w-full" v-if="row_index == 0">
+                            <span class="flex-1"></span>
+                            <span class="flex-1 text-center" v-for="(_col, col_index) in _config.cols"
+                                :key="col_index">{{ _col.title }}</span>
+                        </div>
+                        <div class="flex justify-around w-full gap-4" v-if="_config.cols.length > 0">
+                            <span class="flex-1">{{ _row.title }}</span>
+                            <input class="flex-1 min-w-0" type="text" v-for="(_col, col_index) in _config.cols"
+                                :key="col_index" v-model="config[_config.id][row_index][col_index]">
+                        </div>
+                    </div>
+                </template>
+
+                <template v-else>
+                    <div class="flex items-center gap-4 justify-between w-full"
+                        v-for="(_item, item_index) in _config.config" :key="item_index">
+                        <span class="w-1/2">{{ _item.title }}</span>
+                        <input class="w-1/2" type="number" v-model="config[_item.id]" :placeholder="_item.title">
+                    </div>
+                </template>
+            </div>
+        </section>
+
+        <!-- Serial -->
+        <section v-show="active_tab == 'serial'">
+            <!-- Input Field -->
+            <div class="card p-4 flex w-full mb-4">
+                <h4>Serial</h4>
+                <hr>
+                <input class="w-full" type="text" v-model="serial.input_field" @keyup.enter="serialSend" />
+                <button @click="serialSend">Send</button>
+                <span class="ml-auto">{{ serial.input_field.length }}</span>
+            </div>
+            <!-- Recent -->
+            <div class="card flex w-full p-4 justify-between" v-show="serial.log.length > 0">
+                <h4>Recent</h4>
+                <button class="red" @click="serial.log = []">Clear Log</button>
+                <hr>
+
+                <ul class="list w-full">
+                    <li v-for="(_log, index) in serial.log" :key="index" class="flex items-center gap-2">
+                        <span class="grow" @click="print('span')">{{ _log }}</span>
+                        <button @click="serialSend(_log)" class="btn-sm">Write</button>
+                        <button @click="removeLog(index)" class="btn-sm red">Remove</button>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>
